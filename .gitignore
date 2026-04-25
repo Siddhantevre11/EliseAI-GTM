@@ -1,0 +1,6 @@
+.env
+__pycache__/
+google-service-account.json
+gtmengine-494418-9c53a5ae283d.json
+nul
+.vscode/
