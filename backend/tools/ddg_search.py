@@ -7,7 +7,7 @@ Provides company news, market information, and related articles.
 
 import os
 from typing import Optional, List, Dict
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 
 load_dotenv()
