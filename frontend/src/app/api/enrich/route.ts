@@ -1,41 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+import { PYTHON_BACKEND_URL } from "@/lib/backendConfig";
 
 export async function POST(request: NextRequest) {
+  const endpoint = "enrich";
+  console.log(`Proxying request to: ${PYTHON_BACKEND_URL}/${endpoint}`);
+
   try {
     const lead = await request.json();
 
-    const response = await fetch(`${PYTHON_BACKEND_URL}/enrich`, {
+    const response = await fetch(`${PYTHON_BACKEND_URL}/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(lead),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Backend error [${endpoint}]:`, errorText);
       return NextResponse.json(
-        { error: "Backend error", details: await response.text() },
-        { status: 500 }
+        { error: "Service temporarily unavailable. Please try again." },
+        { status: 502 }
       );
     }
 
     const result = await response.json();
     return NextResponse.json(result);
   } catch (error) {
-    console.error("API route error:", error);
+    console.error(`Proxy error [${endpoint}]:`, error);
     return NextResponse.json(
-      {
-        tier: null,
-        score_rationale: "Backend not available. Start with: python main.py",
-        email_draft: { subject: "", body: "" },
-        talking_points: [],
-        key_data_points: {},
-        buying_signals: {},
-        objection_handling: {},
-        sales_signal: "",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 200 }
+      { error: "Service temporarily unavailable. Please try again." },
+      { status: 502 }
     );
   }
 }

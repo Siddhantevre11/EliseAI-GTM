@@ -1,20 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+import { PYTHON_BACKEND_URL } from "@/lib/backendConfig";
 
 export async function POST(request: NextRequest) {
+  const endpoint = "export/csv";
+  console.log(`Proxying request to: ${PYTHON_BACKEND_URL}/${endpoint}`);
+
   try {
     const body = await request.json();
     const { results } = body;
 
-    const response = await fetch(`${PYTHON_BACKEND_URL}/export/csv`, {
+    const response = await fetch(`${PYTHON_BACKEND_URL}/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ results }),
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Backend error [${endpoint}]:`, errorText);
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again." },
+        { status: 502 }
+      );
+    }
+
     const data = await response.json();
-    
+
     if (data.csv) {
       return new Response(data.csv, {
         status: 200,
@@ -24,13 +35,13 @@ export async function POST(request: NextRequest) {
         },
       });
     }
-    
+
     return NextResponse.json(data);
   } catch (error) {
-    console.error("CSV export error:", error);
+    console.error(`Proxy error [${endpoint}]:`, error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { error: "Service temporarily unavailable. Please try again." },
+      { status: 502 }
     );
   }
 }
