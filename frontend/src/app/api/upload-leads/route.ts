@@ -24,9 +24,16 @@ export async function POST(request: Request) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Backend error [${endpoint}]:`, errorText);
+      let errorMsg = "Service temporarily unavailable. Please try again.";
+      try {
+        const errJson = JSON.parse(errorText);
+        if (errJson.detail) errorMsg = errJson.detail;
+      } catch (e) {
+        if (errorText) errorMsg = errorText;
+      }
       return NextResponse.json(
-        { error: "Service temporarily unavailable. Please try again." },
-        { status: 502 }
+        { error: errorMsg },
+        { status: response.status }
       );
     }
 
