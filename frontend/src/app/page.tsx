@@ -290,9 +290,14 @@ export default function Home() {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600">
             <Zap className="h-5 w-5 text-white" />
           </div>
-          <h1 className="text-lg font-bold text-zinc-50">
-            EliseAI GTM
-          </h1>
+          <div className="flex flex-col">
+            <h1 className="text-lg font-bold text-zinc-50 leading-tight">
+              SignalDesk
+            </h1>
+            <p className="text-[10px] text-zinc-500 leading-none">
+              Turn GTM data into instant answers and actions. Elise Signal
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
