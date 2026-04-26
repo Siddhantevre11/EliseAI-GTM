@@ -60,30 +60,30 @@ def _get_client():
         except Exception as e:
             print(f"Service account file failed: {e}")
     
-    # Try reading from env directly with different approach
+    # Try reading from env directly
     try:
-        import io
-        json_str = SHEETS_SERVICE_ACCOUNT_JSON
+        creds_dict = json.loads(SHEETS_SERVICE_ACCOUNT_JSON)
         
-        # Try using gspread service account method directly
-        from google.oauth2 import service_account as sa
-        
-        # Parse JSON
-        creds_dict = json.loads(json_str)
-        
-        # Try loading key differently
+        # Clean the private key
         key = creds_dict.get("private_key", "")
+        if key:
+            # Handle literal \n if they survived JSON loading
+            key = key.replace("\\n", "\n")
+            # Ensure it starts and ends correctly
+            if not key.startswith("-----BEGIN"):
+                key = "-----BEGIN PRIVATE KEY-----\n" + key
+            if not key.endswith("-----END PRIVATE KEY-----\n") and not key.endswith("-----END PRIVATE KEY-----"):
+                key = key + "\n-----END PRIVATE KEY-----\n"
+            creds_dict["private_key"] = key
         
-        # Create credentials using RSA directly
-        from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.backends import default_backend
-        
-        # Encode to bytes and try loading
-        key_bytes = key.encode('utf-8')
-        print("Key bytes sample:", key_bytes[:50])
-        
+        from google.oauth2 import service_account
+        creds = service_account.Credentials.from_service_account_info(
+            creds_dict,
+            scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"],
+        )
+        return gspread.authorize(creds)
     except Exception as e:
-        print(f"All methods failed: {e}")
+        print(f"Environment credentials failed: {e}")
     
     raise RuntimeError("Could not authenticate with Google Sheets. Please check service account credentials.")
 
