@@ -39,10 +39,10 @@ export async function POST(request: Request) {
 
     const data = await response.json();
     return NextResponse.json(data);
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Proxy error [${endpoint}]:`, error);
     return NextResponse.json(
-      { error: "Service temporarily unavailable. Please try again." },
+      { error: error?.message || "Service temporarily unavailable. Please try again." },
       { status: 502 }
     );
   }
