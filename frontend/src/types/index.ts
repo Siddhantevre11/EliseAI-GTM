@@ -65,15 +65,17 @@ export interface PeerCaseStudy {
 }
 
 export interface ROIEstimate {
-  prospect_units: number;
-  inquiries_per_month_est: number;
-  avg_inquiry_handling_min: number;
-  time_saved_hours_month: number;
-  staff_cost_per_hour: number;
-  monthly_savings: number;
-  eliseai_cost_monthly: number;
-  net_monthly_roi: number;
-  annual_savings: number;
+  prospect_units?: number | null;
+  inquiries_per_month_est?: number | null;
+  avg_inquiry_handling_min?: number | null;
+  time_saved_hours_month?: number | null;
+  staff_cost_per_hour?: number | null;
+  monthly_savings?: number | null;
+  eliseai_cost_monthly?: number | null;
+  net_monthly_roi?: number | null;
+  annual_savings?: number | null;
+  market_renter_pct?: number | null;
+  market_vacancy?: number | null;
 }
 
 export interface DecisionMakerContext {
@@ -93,7 +95,7 @@ export interface IndustryBenchmark {
 }
 
 export interface EnrichmentResult {
-  tier: "A" | "B" | "C" | null;
+  tier: "A" | "B" | "C" | "NEEDS_REVIEW" | null;
   priority_score: number;
   score_rationale: string;
   key_data_points: KeyDataPoints;
@@ -107,6 +109,7 @@ export interface EnrichmentResult {
   decision_maker_context: DecisionMakerContext;
   industry_benchmark: IndustryBenchmark;
   estimated_time_saved_minutes: number;
+  market_signals?: string[];
 
   _lead?: Lead;
   _raw_data?: Record<string, unknown>;

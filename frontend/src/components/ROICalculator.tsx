@@ -11,7 +11,7 @@ interface ROICalculatorProps {
 }
 
 export function ROICalculator({ roi, editable = false, onUpdate }: ROICalculatorProps) {
-  const [localUnits, setLocalUnits] = useState(roi.prospect_units);
+  const [localUnits, setLocalUnits] = useState(roi.prospect_units ?? 0);
 
   const calculateROI = (units: number) => {
     const inquiries = Math.round(units / 10);
@@ -34,6 +34,19 @@ export function ROICalculator({ roi, editable = false, onUpdate }: ROICalculator
   };
 
   const displayROI = editable ? calculateROI(localUnits) : roi;
+
+  // Provide default values for null fields
+  const safeROI = {
+    ...displayROI,
+    prospect_units: displayROI.prospect_units ?? 0,
+    inquiries_per_month_est: displayROI.inquiries_per_month_est ?? 0,
+    time_saved_hours_month: displayROI.time_saved_hours_month ?? 0,
+    monthly_savings: displayROI.monthly_savings ?? 0,
+    staff_cost_per_hour: displayROI.staff_cost_per_hour ?? 25,
+    eliseai_cost_monthly: displayROI.eliseai_cost_monthly ?? 0,
+    net_monthly_roi: displayROI.net_monthly_roi ?? 0,
+    annual_savings: displayROI.annual_savings ?? 0,
+  };
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
@@ -68,7 +81,7 @@ export function ROICalculator({ roi, editable = false, onUpdate }: ROICalculator
               Time Saved/Month
             </div>
             <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-              {displayROI.time_saved_hours_month}h
+              {safeROI.time_saved_hours_month}h
             </p>
           </div>
 
@@ -78,7 +91,7 @@ export function ROICalculator({ roi, editable = false, onUpdate }: ROICalculator
               Monthly Savings
             </div>
             <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-              ${displayROI.monthly_savings.toLocaleString()}
+              ${safeROI.monthly_savings.toLocaleString()}
             </p>
           </div>
         </div>
@@ -86,33 +99,33 @@ export function ROICalculator({ roi, editable = false, onUpdate }: ROICalculator
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-zinc-500">Inquiries/month (est.)</span>
-            <span className="text-zinc-700 dark:text-zinc-300">{displayROI.inquiries_per_month_est}</span>
+            <span className="text-zinc-700 dark:text-zinc-300">{safeROI.inquiries_per_month_est}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-zinc-500">Staff cost (@ $25/hr)</span>
-            <span className="text-zinc-700 dark:text-zinc-300">${displayROI.staff_cost_per_hour}/hr</span>
+            <span className="text-zinc-700 dark:text-zinc-300">${safeROI.staff_cost_per_hour}/hr</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-zinc-500">EliseAI cost</span>
-            <span className="text-zinc-700 dark:text-zinc-300">${displayROI.eliseai_cost_monthly.toLocaleString()}/mo</span>
+            <span className="text-zinc-700 dark:text-zinc-300">${safeROI.eliseai_cost_monthly.toLocaleString()}/mo</span>
           </div>
           <div className="border-t border-zinc-200 pt-2 dark:border-zinc-700">
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500">Net ROI/month</span>
-              <span className={`font-medium ${displayROI.net_monthly_roi >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {displayROI.net_monthly_roi >= 0 ? "+" : ""}${displayROI.net_monthly_roi.toLocaleString()}
+              <span className={`font-medium ${safeROI.net_monthly_roi >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {safeROI.net_monthly_roi >= 0 ? "+" : ""}${safeROI.net_monthly_roi.toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500">Annual savings</span>
-              <span className={`font-medium ${displayROI.annual_savings >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {displayROI.annual_savings >= 0 ? "+" : ""}${displayROI.annual_savings.toLocaleString()}
+              <span className={`font-medium ${safeROI.annual_savings >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {safeROI.annual_savings >= 0 ? "+" : ""}${safeROI.annual_savings.toLocaleString()}
               </span>
             </div>
           </div>
         </div>
 
-        {displayROI.net_monthly_roi >= 0 ? (
+        {safeROI.net_monthly_roi >= 0 ? (
           <div className="mt-4 flex items-center gap-2 rounded-lg bg-green-50 p-3 dark:bg-green-900/30">
             <TrendingUp className="h-4 w-4 text-green-600" />
             <p className="text-sm text-green-800 dark:text-green-200">

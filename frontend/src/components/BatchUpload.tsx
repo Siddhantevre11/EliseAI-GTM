@@ -1,21 +1,22 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { EnrichmentResult, Lead, BatchStatus } from "@/types";
-import { Upload, Loader2, FileSpreadsheet } from "lucide-react";
+import { Upload, Loader2, FileSpreadsheet, AlertCircle } from "lucide-react";
 
 interface BatchUploadProps {
   onComplete: (results: EnrichmentResult[], status: BatchStatus) => void;
   onProcessingChange: (processing: boolean) => void;
   onProgress?: (current: number, total: number, company: string) => void;
+  onLeadEnriched?: (result: EnrichmentResult, counts: { tierA: number; tierB: number; tierC: number; errors: number }) => void;
 }
 
-export function BatchUpload({ onComplete, onProcessingChange, onProgress }: BatchUploadProps) {
+export function BatchUpload({ onComplete, onProcessingChange, onProgress, onLeadEnriched }: BatchUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [totalLeads, setTotalLeads] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [progress, setProgress] = useState({ current: 0, total: 0, company: "" });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -32,6 +33,7 @@ export function BatchUpload({ onComplete, onProcessingChange, onProgress }: Batc
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+    setUploadError(null);
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       await handleFile(e.dataTransfer.files[0]);
@@ -39,254 +41,362 @@ export function BatchUpload({ onComplete, onProcessingChange, onProgress }: Batc
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUploadError(null);
     if (e.target.files && e.target.files[0]) {
       await handleFile(e.target.files[0]);
     }
   };
 
   const handleFile = async (file: File) => {
-    if (!file.name.endsWith(".csv")) {
-      alert("Please upload a CSV file");
+    const validExtensions = [".csv", ".xlsx", ".xls"];
+    const hasValidExtension = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+
+    if (!hasValidExtension) {
+      setUploadError("Unsupported file format. Please upload CSV or XLSX.");
       return;
     }
+
+    const MAX_SIZE = 20 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setUploadError("File size exceeds 20MB limit.");
+      return;
+    }
+
     setFile(file);
+    await processFile(file);
   };
 
-  const processBatch = useCallback(async () => {
-    if (!file) return;
-
-    setIsProcessing(true);
+  const processFile = async (file: File) => {
+    setIsUploading(true);
+    setUploadError(null);
     onProcessingChange(true);
 
-    const text = await file.text();
-    const lines = text.split("\n").filter((line) => line.trim());
-    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const leads: Lead[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(",");
-      const leadData: Record<string, string> = {};
-      
-      // Map CSV columns to lead fields
-      headers.forEach((header, index) => {
-        const headerMap: Record<string, string> = {
-          "first name": "first_name",
-          "last name": "last_name",
-          "email": "email",
-          "company": "company",
-          "property address": "property_address",
-          "city": "city",
-          "state": "state",
-          "zip": "zip",
-        };
-        const field = headerMap[header];
-        if (field) {
-          leadData[field] = values[index]?.trim() || "";
-        }
+      const response = await fetch("/api/upload-leads", {
+        method: "POST",
+        body: formData,
       });
-      
-      // Combine First Name + Last Name → name
-      const firstName = leadData["first_name"] || "";
-      const lastName = leadData["last_name"] || "";
-      const fullName = `${firstName} ${lastName}`.trim();
-      
-      // Create lead object with all fields
-      const lead: Lead = {
-        name: fullName,
-        email: leadData["email"] || "",
-        company: leadData["company"] || "",
-        property_address: leadData["property_address"] || "",
-        city: leadData["city"] || "",
-        state: leadData["state"] || "",
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setUploadError(data.error || "Upload failed. Please try again.");
+        setIsUploading(false);
+        onProcessingChange(false);
+        return;
+      }
+
+      const rawLeads = data.leads;
+      const total = rawLeads.length;
+      setProgress({ current: 0, total, company: "" });
+
+      const enrichedResults: EnrichmentResult[] = [];
+      let tierA = 0, tierB = 0, tierC = 0, errors = 0;
+
+      for (let i = 0; i < rawLeads.length; i++) {
+        const rawLead = rawLeads[i];
+        const lead: Lead = {
+          name: rawLead.name || "",
+          email: rawLead.email || "",
+          company: rawLead.company || "",
+          property_address: rawLead.property_address || "",
+          city: rawLead.city === "[MISSING]" ? "" : rawLead.city,
+          state: rawLead.state === "[MISSING]" ? "" : rawLead.state,
+        };
+
+        setProgress({ current: i + 1, total, company: lead.company });
+        onProgress?.(i + 1, total, lead.company);
+
+        try {
+          const enrichResponse = await fetch("/api/enrich", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(lead),
+          });
+
+          let enriched: EnrichmentResult;
+
+          if (enrichResponse.ok) {
+            enriched = await enrichResponse.json();
+            if (enriched.tier === "A") tierA++;
+            else if (enriched.tier === "B") tierB++;
+            else tierC++;
+          } else {
+            enriched = {
+              tier: null,
+              priority_score: 0,
+              score_rationale: "Enrichment failed",
+              key_data_points: {
+                renter_pct: null,
+                vacancy_rate: null,
+                rent_growth_pct: null,
+                median_income: null,
+                total_renter_units: null,
+                top_news_headline: null,
+                company_summary: null,
+                walkscore: null,
+                transitscore: null,
+                bikescore: null,
+                walkscore_description: null,
+                data_source: null,
+                is_fallback: null,
+                rent_growth_is_fallback: null,
+              },
+              sales_signal: "",
+              talking_points: [],
+              email_draft: { subject: "", body: "" },
+              buying_signals: {
+                expansion_detected: false,
+                expansion_detail: null,
+                funding_detected: false,
+                funding_detail: null,
+                leadership_change: false,
+                leadership_detail: null,
+                portfolio_growth: false,
+                portfolio_detail: null,
+              },
+              objection_handling: {},
+              peer_case_study: {
+                similar_company: "",
+                company_size: "",
+                market: "",
+                challenge: "",
+                result: "",
+              },
+              roi_estimate: {},
+              decision_maker_context: {
+                company_size_tier: "Local",
+                typical_buyer: "",
+                primary_pain_point: "",
+                what_they_google: "",
+              },
+              industry_benchmark: {
+                avg_response_time_hours: 0,
+                prospect_response_time: 0,
+                avg_vacancy_rate: 0,
+                prospect_market_vacancy: 0,
+                avg_rent_growth: 0,
+                prospect_market_rent_growth: 0,
+              },
+              estimated_time_saved_minutes: 0,
+              _lead: lead,
+              _needs_manual_review: rawLead.requires_review || false,
+            };
+            errors++;
+          }
+
+          enrichedResults.push(enriched);
+          onLeadEnriched?.(enriched, { tierA, tierB, tierC, errors });
+        } catch (err) {
+          errors++;
+          enrichedResults.push({
+            tier: null,
+            priority_score: 0,
+            score_rationale: "Enrichment failed",
+            key_data_points: {
+              renter_pct: null,
+              vacancy_rate: null,
+              rent_growth_pct: null,
+              median_income: null,
+              total_renter_units: null,
+              top_news_headline: null,
+              company_summary: null,
+              walkscore: null,
+              transitscore: null,
+              bikescore: null,
+              walkscore_description: null,
+              data_source: null,
+              is_fallback: null,
+              rent_growth_is_fallback: null,
+            },
+            sales_signal: "",
+            talking_points: [],
+            email_draft: { subject: "", body: "" },
+            buying_signals: {
+              expansion_detected: false,
+              expansion_detail: null,
+              funding_detected: false,
+              funding_detail: null,
+              leadership_change: false,
+              leadership_detail: null,
+              portfolio_growth: false,
+              portfolio_detail: null,
+            },
+            objection_handling: {},
+            peer_case_study: {
+              similar_company: "",
+              company_size: "",
+              market: "",
+              challenge: "",
+              result: "",
+            },
+            roi_estimate: {},
+            decision_maker_context: {
+              company_size_tier: "Local" as const,
+              typical_buyer: "",
+              primary_pain_point: "",
+              what_they_google: "",
+            },
+            industry_benchmark: {
+              avg_response_time_hours: 0,
+              prospect_response_time: 0,
+              avg_vacancy_rate: 0,
+              prospect_market_vacancy: 0,
+              avg_rent_growth: 0,
+              prospect_market_rent_growth: 0,
+            },
+            estimated_time_saved_minutes: 0,
+            _lead: lead,
+            _needs_manual_review: rawLead.requires_review || false,
+          });
+          const failedEnriched: EnrichmentResult = {
+            tier: null,
+            priority_score: 0,
+            score_rationale: "Enrichment failed",
+            key_data_points: {
+              renter_pct: null,
+              vacancy_rate: null,
+              rent_growth_pct: null,
+              median_income: null,
+              total_renter_units: null,
+              top_news_headline: null,
+              company_summary: null,
+              walkscore: null,
+              transitscore: null,
+              bikescore: null,
+              walkscore_description: null,
+              data_source: null,
+              is_fallback: null,
+              rent_growth_is_fallback: null,
+            },
+            sales_signal: "",
+            talking_points: [],
+            email_draft: { subject: "", body: "" },
+            buying_signals: {
+              expansion_detected: false,
+              expansion_detail: null,
+              funding_detected: false,
+              funding_detail: null,
+              leadership_change: false,
+              leadership_detail: null,
+              portfolio_growth: false,
+              portfolio_detail: null,
+            },
+            objection_handling: {},
+            peer_case_study: {
+              similar_company: "",
+              company_size: "",
+              market: "",
+              challenge: "",
+              result: "",
+            },
+            roi_estimate: {},
+            decision_maker_context: {
+              company_size_tier: "Local" as const,
+              typical_buyer: "",
+              primary_pain_point: "",
+              what_they_google: "",
+            },
+            industry_benchmark: {
+              avg_response_time_hours: 0,
+              prospect_response_time: 0,
+              avg_vacancy_rate: 0,
+              prospect_market_vacancy: 0,
+              avg_rent_growth: 0,
+              prospect_market_rent_growth: 0,
+            },
+            estimated_time_saved_minutes: 0,
+            _lead: lead,
+            _needs_manual_review: rawLead.requires_review || false,
+          };
+          onLeadEnriched?.(failedEnriched, { tierA, tierB, tierC, errors });
+        }
+      }
+
+      const status: BatchStatus = {
+        total,
+        processed: total,
+        tierA,
+        tierB,
+        tierC,
+        errors,
       };
-      
-      if (lead.company || lead.name) {
-        leads.push(lead);
-      }
+
+      onComplete(enrichedResults, status);
+      setFile(null);
+    } catch (error) {
+      setUploadError("Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+      onProcessingChange(false);
+      setProgress({ current: 0, total: 0, company: "" });
     }
-
-    setTotalLeads(leads.length);
-
-    const status: BatchStatus = {
-      total: leads.length,
-      processed: 0,
-      tierA: 0,
-      tierB: 0,
-      tierC: 0,
-      errors: 0,
-    };
-
-    const results: EnrichmentResult[] = [];
-
-    for (let i = 0; i < leads.length; i++) {
-      const lead = leads[i];
-      setCurrentIndex(i + 1);
-      onProgress?.(i + 1, leads.length, `${lead.company} (${lead.city}, ${lead.state})`);
-
-      try {
-        const response = await fetch("/api/enrich", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(lead),
-        });
-
-        const result = await response.json();
-        results.push(result);
-
-        status.processed++;
-        if (result.tier === "A") status.tierA++;
-        else if (result.tier === "B") status.tierB++;
-        else if (result.tier === "C") status.tierC++;
-        if (result._needs_manual_review) status.errors++;
-      } catch (error) {
-        results.push({
-          tier: "C",
-          priority_score: 0,
-          score_rationale: "Manual research required due to data gaps: API call failed",
-          email_draft: { subject: "", body: "" },
-          talking_points: [],
-          key_data_points: {
-            renter_pct: null,
-            vacancy_rate: null,
-            rent_growth_pct: null,
-            median_income: null,
-            total_renter_units: null,
-            top_news_headline: null,
-            company_summary: null,
-            walkscore: null,
-            transitscore: null,
-            bikescore: null,
-            walkscore_description: null,
-            data_source: null,
-            is_fallback: null,
-            rent_growth_is_fallback: null,
-          },
-          sales_signal: "",
-          buying_signals: {
-            expansion_detected: false,
-            expansion_detail: null,
-            funding_detected: false,
-            funding_detail: null,
-            leadership_change: false,
-            leadership_detail: null,
-            portfolio_growth: false,
-            portfolio_detail: null,
-          },
-          objection_handling: {},
-          peer_case_study: {
-            similar_company: "",
-            company_size: "",
-            market: "",
-            challenge: "",
-            result: "",
-          },
-          roi_estimate: {
-            prospect_units: 0,
-            inquiries_per_month_est: 0,
-            avg_inquiry_handling_min: 0,
-            time_saved_hours_month: 0,
-            staff_cost_per_hour: 0,
-            monthly_savings: 0,
-            eliseai_cost_monthly: 0,
-            net_monthly_roi: 0,
-            annual_savings: 0,
-          },
-          decision_maker_context: {
-            company_size_tier: "Local",
-            typical_buyer: "",
-            primary_pain_point: "",
-            what_they_google: "",
-          },
-          industry_benchmark: {
-            avg_response_time_hours: 4.2,
-            prospect_response_time: 0,
-            avg_vacancy_rate: 4.1,
-            prospect_market_vacancy: 0,
-            avg_rent_growth: 2.8,
-            prospect_market_rent_growth: 0,
-          },
-          estimated_time_saved_minutes: 0,
-          _needs_manual_review: true,
-          _api_errors: ["API call failed"],
-          _lead: lead,
-        });
-        status.errors++;
-      }
-
-      onComplete(results, { ...status });
-    }
-
-    setIsProcessing(false);
-    onProcessingChange(false);
-  }, [file, onComplete, onProcessingChange, onProgress]);
+  };
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-        Batch Upload
-      </h2>
-
+    <div className="rounded-lg bg-zinc-900 p-4">
       <div
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
-        className={`relative cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
+        onClick={() => !isUploading && fileInputRef.current?.click()}
+        className={`relative cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
           dragActive
-            ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950"
-            : "border-zinc-300 dark:border-zinc-700"
-        }`}
-        onClick={() => fileInputRef.current?.click()}
+            ? "border-indigo-500 bg-indigo-950/30"
+            : uploadError
+            ? "border-red-500/50"
+            : "border-zinc-700 hover:border-zinc-600"
+        } ${isUploading ? "pointer-events-none opacity-60" : ""}`}
       >
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv"
+          accept=".csv,.xlsx,.xls"
           onChange={handleFileChange}
           className="hidden"
+          disabled={isUploading}
         />
-        {file ? (
+
+        {isUploading ? (
           <div className="flex flex-col items-center gap-2">
-            <FileSpreadsheet className="h-8 w-8 text-indigo-600" />
-            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-              {file.name}
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+            <p className="text-sm font-medium text-zinc-300">
+              Enriching {progress.current} of {progress.total}...
             </p>
+            {progress.company && (
+              <p className="text-xs text-zinc-500 truncate max-w-[200px]">
+                {progress.company}
+              </p>
+            )}
+          </div>
+        ) : file ? (
+          <div className="flex flex-col items-center gap-2">
+            <FileSpreadsheet className="h-8 w-8 text-emerald-500" />
+            <p className="text-sm font-medium text-zinc-200">{file.name}</p>
             <p className="text-xs text-zinc-500">Click to change file</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <Upload className="h-8 w-8 text-zinc-400" />
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Drop CSV file here or click to upload
+            <Upload className="h-8 w-8 text-zinc-500" />
+            <p className="text-sm font-medium text-zinc-300">
+              Drop file here or click to upload
             </p>
             <p className="text-xs text-zinc-500">
-              Required columns: company, city, state
+              CSV, XLSX (max 100 rows, 20MB)
             </p>
           </div>
         )}
       </div>
 
-      {file && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            processBatch();
-          }}
-          disabled={isProcessing}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Processing {currentIndex}/{totalLeads}...
-            </>
-          ) : (
-            <>
-              <Upload className="h-4 w-4" />
-              Process Batch
-            </>
-          )}
-        </button>
+      {uploadError && (
+        <div className="mt-3 flex items-center gap-2 text-red-400 text-sm">
+          <AlertCircle className="h-4 w-4" />
+          <span>{uploadError}</span>
+        </div>
       )}
     </div>
   );
