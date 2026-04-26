@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SignalDesk | Turn GTM data into instant answers and actions",
-  description: "SignalDesk: Turn GTM data into instant answers and actions",
+  title: "SignalDesk | Elise Signal",
+  description: "Turn GTM data into instant answers and actions. Elise Signal",
 };
 
 export default function RootLayout({

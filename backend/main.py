@@ -18,7 +18,7 @@ app = FastAPI(title="EliseAI GTM Backend", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://*.vercel.app"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -122,9 +122,12 @@ async def send_slack_alert(request: SlackRequest):
     """Send Slack alert on button click."""
     from integrations.slack import send_lead_alert
     try:
+        print(f"DEBUG: Sending Slack alert for {request.lead.get('company')}")
         result = send_lead_alert(request.result, request.lead)
+        print(f"DEBUG: Slack response: {result}")
         return {"success": True, "response": result}
     except Exception as e:
+        print(f"DEBUG: Slack error: {str(e)}")
         return {"success": False, "error": str(e)}
 
 
@@ -133,9 +136,12 @@ async def export_to_sheets(request: SheetsRequest):
     """Write single result to Google Sheets via service account."""
     from integrations.sheets import write_result_to_sheet
     try:
+        print(f"DEBUG: Exporting to Sheets for {request.lead.get('company')}")
         result = write_result_to_sheet(request.result, request.lead)
+        print(f"DEBUG: Sheets response: {result}")
         return {"success": True, "response": result}
     except Exception as e:
+        print(f"DEBUG: Sheets error: {str(e)}")
         return {"success": False, "error": str(e)}
 
 
