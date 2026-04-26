@@ -295,7 +295,7 @@ export default function Home() {
               SignalDesk
             </h1>
             <p className="text-[10px] text-zinc-500 leading-none">
-              Turn GTM data into instant answers and actions. Elise Signal
+              Turn GTM data into instant answers and actions
             </p>
           </div>
         </div>
