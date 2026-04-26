@@ -16,6 +16,7 @@ export default function Home() {
   const [batchResults, setBatchResults] = useState<EnrichmentResult[]>([]);
   const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
   const [tierFilter, setTierFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [showSDRToolkit, setShowSDRToolkit] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "syncing" | "info" } | null>(null);
@@ -257,8 +258,18 @@ export default function Home() {
   };
 
   const filteredResults = useMemo(() => {
-    return tierFilter === "all" ? batchResults : batchResults.filter((r) => r.tier === tierFilter);
-  }, [batchResults, tierFilter]);
+    let filtered = tierFilter === "all" ? batchResults : batchResults.filter((r) => r.tier === tierFilter);
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      filtered = filtered.filter((r) => {
+        const company = (r._lead?.company || "").toLowerCase();
+        const name = (r._lead?.name || "").toLowerCase();
+        const city = (r._lead?.city || "").toLowerCase();
+        return company.includes(lower) || name.includes(lower) || city.includes(lower);
+      });
+    }
+    return filtered;
+  }, [batchResults, tierFilter, searchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filteredResults.length / LEADS_PER_PAGE));
   const startIndex = (currentPage - 1) * LEADS_PER_PAGE + 1;
@@ -334,6 +345,8 @@ export default function Home() {
                 isProcessing={isProcessing}
                 tierFilter={tierFilter}
                 onTierFilterChange={handleTierFilterChange}
+                searchTerm={searchTerm}
+                onSearchTermChange={setSearchTerm}
               />
             </div>
             <div className="mt-auto flex items-center justify-center border-t border-zinc-800 px-4 py-4">

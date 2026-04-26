@@ -26,6 +26,8 @@ interface LeadListProps {
   isProcessing: boolean;
   tierFilter: string;
   onTierFilterChange: (tier: string) => void;
+  searchTerm: string;
+  onSearchTermChange: (term: string) => void;
 }
 
 export function LeadList({
@@ -40,8 +42,9 @@ export function LeadList({
   isProcessing,
   tierFilter,
   onTierFilterChange,
+  searchTerm,
+  onSearchTermChange,
 }: LeadListProps) {
-  const [searchTerm, setSearchTerm] = useState("");
   const [showInput, setShowInput] = useState(false);
 
   const tierCounts = useMemo(() => {
@@ -113,7 +116,7 @@ export function LeadList({
             type="text"
             placeholder="Search company..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => onSearchTermChange(e.target.value)}
             className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-2 pl-10 pr-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-indigo-500 focus:outline-none"
           />
         </div>
