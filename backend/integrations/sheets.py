@@ -39,8 +39,10 @@ def _get_client():
     if not GSPREAD_AVAILABLE:
         raise ImportError("gspread not installed. Run: pip install gspread google-auth")
     
-    if not SHEETS_SERVICE_ACCOUNT_JSON:
-        raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON not set in .env")
+    base64_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_BASE64", "")
+    if not SHEETS_SERVICE_ACCOUNT_JSON and not base64_str:
+        if not os.path.exists("google-service-account.json"):
+            raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 not set in .env")
     
     # Try service account file first
     creds = None
