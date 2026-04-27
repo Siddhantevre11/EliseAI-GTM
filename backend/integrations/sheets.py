@@ -68,12 +68,17 @@ def _get_client():
         base64_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_BASE64", "")
         
         if base64_str:
+            print(f"DEBUG: Found Base64 credentials, length: {len(base64_str)}")
             json_str = base64.b64decode(base64_str).decode("utf-8")
         else:
+            print("DEBUG: Using regular GOOGLE_SERVICE_ACCOUNT_JSON")
             json_str = SHEETS_SERVICE_ACCOUNT_JSON.strip()
             if (json_str.startswith("'") and json_str.endswith("'")) or (json_str.startswith('"') and json_str.endswith('"')):
                 json_str = json_str[1:-1]
-            
+        
+        if not json_str:
+             raise ValueError("Parsed JSON string is empty")
+             
         creds_dict = json.loads(json_str)
         
         # Clean the private key
@@ -93,22 +98,40 @@ def _get_client():
             creds_dict,
             scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"],
         )
-        return gspread.authorize(creds)
+        client = gspread.authorize(creds)
+        print("DEBUG: Successfully authorized with Google Sheets API")
+        return client
     except Exception as e:
-        print(f"Environment credentials failed: {e}")
-    
-    raise RuntimeError("Could not authenticate with Google Sheets. Please check service account credentials.")
+        print(f"DEBUG: Environment credentials failed: {str(e)}")
+        raise RuntimeError(f"Google Sheets Authentication Failed: {str(e)}")
 
 
-def read_leads_from_sheet(sheet_url: Optional[str] = None) -> list[dict]:
-    """Read leads from the configured Google Sheet. Returns list of lead dicts."""
+def _get_worksheet(sheet_url: Optional[str] = None):
+    """Helper to get authorized worksheet with robust URL/Key handling."""
     client = _get_client()
     url = sheet_url or SHEET_URL
     if not url:
         raise ValueError("No sheet URL provided")
     
-    sheet = client.open_by_url(url)
-    worksheet = sheet.sheet1
+    # Try opening by URL, fallback to ID extraction
+    try:
+        sheet = client.open_by_url(url)
+    except Exception:
+        # Extract ID from URL: .../d/ID/...
+        import re
+        match = re.search(r"/d/([a-zA-Z0-9-_]+)", url)
+        if match:
+            sheet_id = match.group(1)
+            sheet = client.open_by_key(sheet_id)
+        else:
+            raise
+            
+    return sheet.sheet1
+
+
+def read_leads_from_sheet(sheet_url: Optional[str] = None) -> list[dict]:
+    """Read leads from the configured Google Sheet. Returns list of lead dicts."""
+    worksheet = _get_worksheet(sheet_url)
     rows = worksheet.get_all_records(expected_headers=HEADERS)
     
     leads = []
@@ -122,13 +145,7 @@ def read_leads_from_sheet(sheet_url: Optional[str] = None) -> list[dict]:
 
 def read_unprocessed_leads(sheet_url: Optional[str] = None) -> list[dict]:
     """Read only leads that haven't been processed (tier column empty)."""
-    client = _get_client()
-    url = sheet_url or SHEET_URL
-    if not url:
-        raise ValueError("No sheet URL provided")
-    
-    sheet = client.open_by_url(url)
-    worksheet = sheet.sheet1
+    worksheet = _get_worksheet(sheet_url)
     rows = worksheet.get_all_records(expected_headers=HEADERS)
     
     leads = []
@@ -143,13 +160,7 @@ def read_unprocessed_leads(sheet_url: Optional[str] = None) -> list[dict]:
 
 def write_result_to_sheet(result: dict, lead: dict, row_index: Optional[int] = None, sheet_url: Optional[str] = None):
     """Write enrichment result back to the sheet."""
-    client = _get_client()
-    url = sheet_url or SHEET_URL
-    if not url:
-        raise ValueError("No sheet URL provided")
-    
-    sheet = client.open_by_url(url)
-    worksheet = sheet.sheet1
+    worksheet = _get_worksheet(sheet_url)
     
     # Get next available row if not specified
     if row_index is None:
@@ -187,13 +198,7 @@ def write_result_to_sheet(result: dict, lead: dict, row_index: Optional[int] = N
 
 def create_sheet_template(sheet_url: Optional[str] = None) -> str:
     """Create/format the sheet with proper headers."""
-    client = _get_client()
-    url = sheet_url or SHEET_URL
-    if not url:
-        raise ValueError("No sheet URL provided")
-    
-    sheet = client.open_by_url(url)
-    worksheet = sheet.sheet1
+    worksheet = _get_worksheet(sheet_url)
     worksheet.update("A1:P1", [HEADERS])
     
     for col in ["A", "B", "C", "D", "E", "F"]:
