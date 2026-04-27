@@ -62,9 +62,15 @@ def _get_client():
     
     # Try reading from env directly
     try:
-        json_str = SHEETS_SERVICE_ACCOUNT_JSON.strip()
-        if (json_str.startswith("'") and json_str.endswith("'")) or (json_str.startswith('"') and json_str.endswith('"')):
-            json_str = json_str[1:-1]
+        import base64
+        base64_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_BASE64", "")
+        
+        if base64_str:
+            json_str = base64.b64decode(base64_str).decode("utf-8")
+        else:
+            json_str = SHEETS_SERVICE_ACCOUNT_JSON.strip()
+            if (json_str.startswith("'") and json_str.endswith("'")) or (json_str.startswith('"') and json_str.endswith('"')):
+                json_str = json_str[1:-1]
             
         creds_dict = json.loads(json_str)
         
