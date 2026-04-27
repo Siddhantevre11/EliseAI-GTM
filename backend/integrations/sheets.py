@@ -84,15 +84,22 @@ def _get_client():
         # Clean the private key aggressively
         key = creds_dict.get("private_key", "")
         if key:
-            # 1. Remove headers/footers to get the raw base64 data
-            raw_key = key.replace("-----BEGIN PRIVATE KEY-----", "")
-            raw_key = raw_key.replace("-----END PRIVATE KEY-----", "")
-            # 2. Remove ALL whitespace (newlines, spaces, carriage returns)
-            raw_key = "".join(raw_key.split())
+            import re
+            # 1. Extract the part between BEGIN and END if it exists
+            match = re.search(r"-----BEGIN PRIVATE KEY-----(.*)-----END PRIVATE KEY-----", key, re.DOTALL)
+            if match:
+                raw_data = match.group(1)
+            else:
+                raw_data = key
+            
+            # 2. Keep ONLY valid base64 characters (A-Z, a-z, 0-9, +, /, =)
+            # This handles literal \n, \r, spaces, and any other garbage
+            clean_data = re.sub(r"[^A-Za-z0-9+/=]", "", raw_data)
+            
             # 3. Reconstruct standard PEM format (64 chars per line)
             formatted_key = "-----BEGIN PRIVATE KEY-----\n"
-            for i in range(0, len(raw_key), 64):
-                formatted_key += raw_key[i:i+64] + "\n"
+            for i in range(0, len(clean_data), 64):
+                formatted_key += clean_data[i:i+64] + "\n"
             formatted_key += "-----END PRIVATE KEY-----\n"
             
             creds_dict["private_key"] = formatted_key
