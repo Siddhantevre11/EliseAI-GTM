@@ -81,17 +81,21 @@ def _get_client():
              
         creds_dict = json.loads(json_str)
         
-        # Clean the private key
+        # Clean the private key aggressively
         key = creds_dict.get("private_key", "")
         if key:
-            # Handle literal \n if they survived JSON loading
-            key = key.replace("\\n", "\n")
-            # Ensure it starts and ends correctly
-            if not key.startswith("-----BEGIN"):
-                key = "-----BEGIN PRIVATE KEY-----\n" + key
-            if not key.endswith("-----END PRIVATE KEY-----\n") and not key.endswith("-----END PRIVATE KEY-----"):
-                key = key + "\n-----END PRIVATE KEY-----\n"
-            creds_dict["private_key"] = key
+            # 1. Remove headers/footers to get the raw base64 data
+            raw_key = key.replace("-----BEGIN PRIVATE KEY-----", "")
+            raw_key = raw_key.replace("-----END PRIVATE KEY-----", "")
+            # 2. Remove ALL whitespace (newlines, spaces, carriage returns)
+            raw_key = "".join(raw_key.split())
+            # 3. Reconstruct standard PEM format (64 chars per line)
+            formatted_key = "-----BEGIN PRIVATE KEY-----\n"
+            for i in range(0, len(raw_key), 64):
+                formatted_key += raw_key[i:i+64] + "\n"
+            formatted_key += "-----END PRIVATE KEY-----\n"
+            
+            creds_dict["private_key"] = formatted_key
         
         from google.oauth2 import service_account
         creds = service_account.Credentials.from_service_account_info(
