@@ -62,7 +62,11 @@ def _get_client():
     
     # Try reading from env directly
     try:
-        creds_dict = json.loads(SHEETS_SERVICE_ACCOUNT_JSON)
+        json_str = SHEETS_SERVICE_ACCOUNT_JSON.strip()
+        if (json_str.startswith("'") and json_str.endswith("'")) or (json_str.startswith('"') and json_str.endswith('"')):
+            json_str = json_str[1:-1]
+            
+        creds_dict = json.loads(json_str)
         
         # Clean the private key
         key = creds_dict.get("private_key", "")
@@ -169,6 +173,8 @@ def write_result_to_sheet(result: dict, lead: dict, row_index: Optional[int] = N
     
     col_range = f"A{row_num}:P{row_num}"
     worksheet.update(col_range, [row_data])
+    
+    return f"Successfully written to row {row_num}"
 
 
 def create_sheet_template(sheet_url: Optional[str] = None) -> str:

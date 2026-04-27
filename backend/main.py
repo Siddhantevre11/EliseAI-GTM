@@ -124,8 +124,14 @@ async def send_slack_alert(request: SlackRequest):
     try:
         print(f"DEBUG: Sending Slack alert for {request.lead.get('company')}")
         result = send_lead_alert(request.result, request.lead)
+        
+        if result and isinstance(result, dict) and "error" in result:
+             return {"success": False, "error": result["error"]}
+        if not result:
+             return {"success": False, "error": "Slack integration is not configured or client failed to initialize."}
+             
         print(f"DEBUG: Slack response: {result}")
-        return {"success": True, "response": result}
+        return {"success": True, "response": "Message sent to Slack"}
     except Exception as e:
         print(f"DEBUG: Slack error: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -138,6 +144,10 @@ async def export_to_sheets(request: SheetsRequest):
     try:
         print(f"DEBUG: Exporting to Sheets for {request.lead.get('company')}")
         result = write_result_to_sheet(request.result, request.lead)
+        
+        if not result:
+             return {"success": False, "error": "Google Sheets integration failed to return a response."}
+             
         print(f"DEBUG: Sheets response: {result}")
         return {"success": True, "response": result}
     except Exception as e:

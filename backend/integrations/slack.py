@@ -26,7 +26,7 @@ def _get_slack_client():
         from slack_sdk import WebClient
         return WebClient(token=SLACK_BOT_TOKEN)
     except ImportError:
-        return None
+        raise ImportError("slack_sdk not installed. Add slack-sdk to requirements.txt")
 
 
 def send_lead_alert(result: dict, lead: dict) -> Optional[dict]:
