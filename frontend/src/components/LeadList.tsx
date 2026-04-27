@@ -73,22 +73,20 @@ export function LeadList({
         <div className="flex gap-2">
           <button
             onClick={() => setShowInput(false)}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              !showInput
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${!showInput
                 ? "bg-indigo-600 text-white"
                 : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
-            }`}
+              }`}
           >
             <Upload className="h-4 w-4" />
             Upload
           </button>
           <button
             onClick={() => setShowInput(true)}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              showInput
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${showInput
                 ? "bg-indigo-600 text-white"
                 : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
-            }`}
+              }`}
           >
             <User className="h-4 w-4" />
             Single Lead
@@ -130,16 +128,15 @@ export function LeadList({
           {SMART_VIEWS.map((view) => {
             const isActive = tierFilter === view.tier;
             const count = getTierCount(view.tier);
-            
+
             return (
               <button
                 key={view.id}
                 onClick={() => handleViewChange(view.tier!)}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                  isActive
+                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${isActive
                     ? "bg-zinc-800 text-zinc-100"
                     : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300"
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between">
                   <span>{view.label}</span>

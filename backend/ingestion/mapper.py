@@ -194,4 +194,15 @@ def transform_row(
                     value = None
             transformed[standard_field] = value
 
+    # Handle combined First Name + Last Name -> name
+    first_name = row.get("First Name") or row.get("first name") or row.get("FirstName") or row.get("first_name") or ""
+    last_name = row.get("Last Name") or row.get("last name") or row.get("LastName") or row.get("last_name") or ""
+    if first_name or last_name:
+        combined_name = f"{first_name} {last_name}".strip()
+        if combined_name:
+            transformed["name"] = combined_name
+        # Also check for separate mappings
+        if "name" in mapping.values() or "First Name" in mapping or "first name" in mapping:
+            pass  # Already mapped
+
     return transformed

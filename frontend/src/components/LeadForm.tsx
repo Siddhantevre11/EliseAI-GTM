@@ -39,6 +39,23 @@ export function LeadForm({ onSubmit, isProcessing }: LeadFormProps) {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label className={labelClass}>
+            <span className="flex items-center gap-1">
+              <User className="h-3 w-3" />
+              Contact Name
+              <span className="text-zinc-600">(optional)</span>
+            </span>
+          </label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => handleChange("name", e.target.value)}
+            className={inputClass}
+            placeholder="Sarah Chen, John Smith, etc."
+          />
+        </div>
+
         <div>
           <label className={labelClass}>
             <span className="flex items-center gap-1">

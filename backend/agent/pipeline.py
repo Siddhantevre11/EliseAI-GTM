@@ -356,8 +356,15 @@ def _process_single_lead(lead: dict, progress_callback: Optional[Callable] = Non
             "estimated_time_saved_minutes": 45,
         }
         
-        # Add metadata
-        result["_lead"] = lead
+        # Add metadata - ensure _lead always preserves all original fields including name
+        result["_lead"] = {
+            "name": lead.get("name") or lead.get("Name") or "",
+            "email": lead.get("email") or lead.get("Email") or "",
+            "company": lead.get("company") or lead.get("Company") or "",
+            "property_address": lead.get("property_address") or lead.get("Property Address") or "",
+            "city": lead.get("city") or lead.get("City") or "",
+            "state": lead.get("state") or lead.get("State") or "",
+        }
         result["_raw_data"] = enriched
         result["_api_errors"] = api_errors
         result["_strategy"] = routing.get("strategy", "unknown")
@@ -375,7 +382,14 @@ def _process_single_lead(lead: dict, progress_callback: Optional[Callable] = Non
             "email_draft": {},
             "_needs_manual_review": True,
             "_api_errors": [str(e)],
-            "_lead": lead,
+            "_lead": {
+                "name": lead.get("name") or lead.get("Name") or "",
+                "email": lead.get("email") or lead.get("Email") or "",
+                "company": lead.get("company") or lead.get("Company") or "",
+                "property_address": lead.get("property_address") or lead.get("Property Address") or "",
+                "city": lead.get("city") or lead.get("City") or "",
+                "state": lead.get("state") or lead.get("State") or "",
+            },
         }
     
     # Apply schema validation

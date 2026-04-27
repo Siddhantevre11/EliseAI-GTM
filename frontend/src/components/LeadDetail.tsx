@@ -24,6 +24,12 @@ export function LeadDetail({ lead, result, onInspect }: LeadDetailProps) {
     ? { subject: "", body: result.email_draft }
     : result.email_draft;
 
+  const displayName = lead?.name || "Unknown Contact";
+  const displayCompany = lead?.company || "Unknown Company";
+  const displayCity = lead?.city || "Unknown";
+  const displayState = lead?.state || "";
+  const displayEmail = lead?.email || "";
+
   const tierColors = {
     A: "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30",
     B: "border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/30",
@@ -40,7 +46,7 @@ export function LeadDetail({ lead, result, onInspect }: LeadDetailProps) {
           <div className="flex-1">
             <div className="mb-2 flex items-center gap-3">
               <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-                {lead.company}
+                {displayCompany}
               </h2>
               <TierBadge tier={result.tier} />
               {result._needs_manual_review && (
@@ -62,16 +68,16 @@ export function LeadDetail({ lead, result, onInspect }: LeadDetailProps) {
             <div className="flex flex-wrap gap-4 text-sm text-zinc-600 dark:text-zinc-400">
               <span className="flex items-center gap-1">
                 <Building2 className="h-4 w-4" />
-                {lead.name || "Unknown Contact"}
+                {displayName}
               </span>
               <span className="flex items-center gap-1">
                 <MapPin className="h-4 w-4" />
-                {lead.city}, {lead.state}
+                {displayCity}{displayState ? `, ${displayState}` : ""}
               </span>
-              {lead.email && (
+              {displayEmail && (
                 <span className="flex items-center gap-1">
                   <Mail className="h-4 w-4" />
-                  {lead.email}
+                  {displayEmail}
                 </span>
               )}
             </div>

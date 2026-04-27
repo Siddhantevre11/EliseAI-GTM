@@ -26,6 +26,9 @@ export function SDRToolkit({ isOpen, onClose, result, onResendToSlack, onCopyEma
   if (!isOpen || !result) return null;
 
   const lead = result._lead || ({} as any);
+  const displayName = lead.name || "Unknown Contact";
+  const displayCompany = lead.company || "Unknown Company";
+  const displayLocation = lead.city && lead.state ? `${lead.city}, ${lead.state}` : (lead.city || lead.state || "Unknown Location");
   const kdp = result.key_data_points || {};
   const email = result.email_draft as { subject?: string; body?: string } | string || { subject: "", body: "" };
   const emailSubject = typeof email === "string" ? "" : (email.subject || "");
@@ -67,7 +70,7 @@ export function SDRToolkit({ isOpen, onClose, result, onResendToSlack, onCopyEma
           <div>
             <h2 className="font-semibold text-zinc-50">SDR Toolkit</h2>
             <p className="text-xs text-zinc-500">
-              {lead.company} - {lead.city}, {lead.state}
+              {displayName} @ {displayCompany} — {displayLocation}
             </p>
           </div>
         </div>

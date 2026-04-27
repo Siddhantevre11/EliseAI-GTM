@@ -69,8 +69,10 @@ export function ClayGrid({
         <thead className="sticky top-0 bg-zinc-900 text-xs font-medium uppercase tracking-wide text-zinc-500">
           <tr>
             <th className="w-8 px-4 py-3 text-left"></th>
-            <th className="px-4 py-3 text-left">Company</th>
-            <th className="px-4 py-3 text-center">Tier</th>
+          <th className="px-4 py-3 text-left">Company</th>
+          <th className="px-4 py-3 text-left">Contact</th>
+          <th className="px-4 py-3 text-left">Email</th>
+          <th className="px-4 py-3 text-center">Tier</th>
             <th className="px-4 py-3 text-left">Market</th>
             <th className="px-4 py-3 text-right">Renter %</th>
             <th className="px-4 py-3 text-right">Rent Growth</th>
@@ -121,6 +123,48 @@ export function ClayGrid({
                   ) : (
                     <span className="font-medium text-zinc-100">
                       {lead.company || "Unknown"}
+                    </span>
+                  )}
+                </td>
+
+                <td
+                  className="px-4 py-2"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    handleDoubleClick(index, "name", lead.name || "");
+                  }}
+                >
+                  {isEditing && editingCell?.field === "name" ? (
+                    <InlineEdit
+                      value={editValue}
+                      onChange={setEditValue}
+                      onSave={() => handleSaveEdit(index)}
+                      onCancel={handleCancelEdit}
+                    />
+                  ) : (
+                    <span className="text-zinc-400">
+                      {lead.name || "Unknown"}
+                    </span>
+                  )}
+                </td>
+
+                <td
+                  className="px-4 py-2"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    handleDoubleClick(index, "email", lead.email || "");
+                  }}
+                >
+                  {isEditing && editingCell?.field === "email" ? (
+                    <InlineEdit
+                      value={editValue}
+                      onChange={setEditValue}
+                      onSave={() => handleSaveEdit(index)}
+                      onCancel={handleCancelEdit}
+                    />
+                  ) : (
+                    <span className="text-zinc-400">
+                      {lead.email || "—"}
                     </span>
                   )}
                 </td>
