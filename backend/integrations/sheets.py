@@ -35,75 +35,76 @@ HEADERS = [
 REQUIRED_INPUT_COLS = ["name", "email", "company", "city", "state"]
 
 
+def _clean_private_key(key: str) -> str:
+    """Aggressively clean and re-format a PEM private key."""
+    if not key:
+        return ""
+    import re
+    
+    # 1. Remove obvious headers and footers first
+    clean_data = key.replace("-----BEGIN PRIVATE KEY-----", "")
+    clean_data = clean_data.replace("-----END PRIVATE KEY-----", "")
+    clean_data = clean_data.replace("BEGIN PRIVATE KEY", "")
+    clean_data = clean_data.replace("END PRIVATE KEY", "")
+    clean_data = clean_data.replace("PRIVATE KEY", "")
+    
+    # 2. Keep ONLY valid base64 characters (A-Z, a-z, 0-9, +, /, =)
+    # This strips dashes, newlines, and the remaining 'BEGIN'/'END' if they were missed
+    clean_data = re.sub(r"[^A-Za-z0-9+/=]", "", clean_data)
+    
+    # 3. Reconstruct standard PEM format (64 chars per line)
+    formatted_key = "-----BEGIN PRIVATE KEY-----\n"
+    for i in range(0, len(clean_data), 64):
+        formatted_key += clean_data[i:i+64] + "\n"
+    formatted_key += "-----END PRIVATE KEY-----\n"
+    return formatted_key
+
+
 def _get_client():
     if not GSPREAD_AVAILABLE:
         raise ImportError("gspread not installed. Run: pip install gspread google-auth")
     
     base64_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_BASE64", "")
-    if not SHEETS_SERVICE_ACCOUNT_JSON and not base64_str:
-        if not os.path.exists("google-service-account.json"):
-            raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 not set in .env")
+    creds_dict = None
     
-    # Try service account file first
-    creds = None
+    # 1. Try file
     if os.path.exists("google-service-account.json"):
         try:
-            from google.oauth2 import service_account
             with open("google-service-account.json", "r") as f:
                 creds_dict = json.load(f)
-                # Fix any newlines
-                if "private_key" in creds_dict:
-                    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-                creds = service_account.Credentials.from_service_account_info(
-                    creds_dict,
-                    scopes=["https://www.googleapis.com/auth/spreadsheets"],
-                )
-            return gspread.authorize(creds)
+                print("DEBUG: Using google-service-account.json file")
         except Exception as e:
-            print(f"Service account file failed: {e}")
-    
-    # Try reading from env directly
-    try:
-        import base64
-        base64_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_BASE64", "")
-        
-        if base64_str:
-            print(f"DEBUG: Found Base64 credentials, length: {len(base64_str)}")
+            print(f"DEBUG: File load failed: {e}")
+            
+    # 2. Try Base64 Env
+    if not creds_dict and base64_str:
+        try:
+            import base64
             json_str = base64.b64decode(base64_str).decode("utf-8")
-        else:
-            print("DEBUG: Using regular GOOGLE_SERVICE_ACCOUNT_JSON")
+            creds_dict = json.loads(json_str)
+            print("DEBUG: Using Base64 environment credentials")
+        except Exception as e:
+            print(f"DEBUG: Base64 decode failed: {e}")
+            
+    # 3. Try Regular Env
+    if not creds_dict and SHEETS_SERVICE_ACCOUNT_JSON:
+        try:
             json_str = SHEETS_SERVICE_ACCOUNT_JSON.strip()
             if (json_str.startswith("'") and json_str.endswith("'")) or (json_str.startswith('"') and json_str.endswith('"')):
                 json_str = json_str[1:-1]
-        
-        if not json_str:
-             raise ValueError("Parsed JSON string is empty")
-             
-        creds_dict = json.loads(json_str)
-        
-        # Clean the private key aggressively
-        key = creds_dict.get("private_key", "")
-        if key:
-            import re
-            # 1. Extract the part between BEGIN and END if it exists
-            match = re.search(r"-----BEGIN PRIVATE KEY-----(.*)-----END PRIVATE KEY-----", key, re.DOTALL)
-            if match:
-                raw_data = match.group(1)
-            else:
-                raw_data = key
-            
-            # 2. Keep ONLY valid base64 characters (A-Z, a-z, 0-9, +, /, =)
-            # This handles literal \n, \r, spaces, and any other garbage
-            clean_data = re.sub(r"[^A-Za-z0-9+/=]", "", raw_data)
-            
-            # 3. Reconstruct standard PEM format (64 chars per line)
-            formatted_key = "-----BEGIN PRIVATE KEY-----\n"
-            for i in range(0, len(clean_data), 64):
-                formatted_key += clean_data[i:i+64] + "\n"
-            formatted_key += "-----END PRIVATE KEY-----\n"
-            
-            creds_dict["private_key"] = formatted_key
-        
+            creds_dict = json.loads(json_str)
+            print("DEBUG: Using regular JSON environment credentials")
+        except Exception as e:
+            print(f"DEBUG: Regular JSON parse failed: {e}")
+
+    if not creds_dict:
+        raise ValueError("No valid Google Service Account credentials found (file or environment)")
+
+    # Aggressively clean the private key regardless of source
+    if "private_key" in creds_dict:
+        creds_dict["private_key"] = _clean_private_key(creds_dict["private_key"])
+    
+    try:
         from google.oauth2 import service_account
         creds = service_account.Credentials.from_service_account_info(
             creds_dict,
@@ -113,7 +114,7 @@ def _get_client():
         print("DEBUG: Successfully authorized with Google Sheets API")
         return client
     except Exception as e:
-        print(f"DEBUG: Environment credentials failed: {str(e)}")
+        print(f"DEBUG: Final authorization failed: {str(e)}")
         raise RuntimeError(f"Google Sheets Authentication Failed: {str(e)}")
 
 
