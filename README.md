@@ -12,6 +12,10 @@ This tool transforms basic inbound leads into **SDR-ready opportunities** with:
 - Talking points for sales calls
 - Deal-closing context (buying signals, objections, ROI)
 
+
+<img width="503" height="502" alt="image" src="https://github.com/user-attachments/assets/30eb2c29-2e01-43b3-87a0-7d9f8bfed16b" />
+
+
 ## Quick Start
 
 ### 1. Install Dependencies
